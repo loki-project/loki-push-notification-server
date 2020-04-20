@@ -160,59 +160,33 @@ class SilentPushNotificationHelper(PushNotificationHelper):
 class NormalPushNotificationHelper(PushNotificationHelper):
     def __init__(self, logger):
         self.api = LokiAPI()
-        self.pubkey_token_dict = {}
-        self.last_hash = {}
+        self.session_ids = []
         super().__init__(logger)
         self.firebase_app = firebase_admin.initialize_app(credentials.Certificate(FIREBASE_TOKEN))
 
     def load_tokens(self):
-        self.pubkey_token_dict = LokiDatabase.get_valid_session_ids()
+        self.session_ids = LokiDatabase.get_instance().get_valid_session_ids
 
-        for tokens in self.pubkey_token_dict.values():
+        for session_id in self.session_ids:
+            tokens = LokiDatabase.get_instance().get_tokens(session_id)
             for token in tokens:
                 self.push_fails[token] = 0
 
-        for pubkey in self.pubkey_token_dict.keys():
-            self.last_hash[pubkey] = {LASTHASH: '',
-                                      EXPIRATION: 0}
-
-    def update_last_hash(self, pubkey, last_hash, expiration):
+    def update_last_hash(self, session_id, last_hash, expiration):
         expiration = process_expiration(expiration)
-        if pubkey in self.last_hash.keys():
-            if self.last_hash[pubkey][EXPIRATION] < expiration:
-                self.last_hash[pubkey] = {LASTHASH: last_hash,
-                                          EXPIRATION: expiration}
+        LokiDatabase.get_instance().update_last_hash(session_id, last_hash, expiration)
 
-    def update_token_pubkey_pair(self, token, pubkey):
-        if pubkey not in self.pubkey_token_dict.keys():
-            self.pubkey_token_dict[pubkey] = set()
-            self.api.get_swarm(pubkey)
-        else:
-            for key, tokens in self.pubkey_token_dict.items():
-                if key == pubkey and token in tokens:
-                    return
-                if token in tokens:
-                    self.pubkey_token_dict.pop(key)
-                    self.pubkey_token_dict[pubkey] = tokens
-
-        self.pubkey_token_dict[pubkey].add(token)
-        self.push_fails[token] = 0
-        self.last_hash[pubkey] = {LASTHASH: '',
-                                  EXPIRATION: 0}
-        with open(PUBKEY_TOKEN_DB, 'wb') as pubkey_token_db:
-            pickle.dump(self.pubkey_token_dict, pubkey_token_db)
-        pubkey_token_db.close()
+    def update_token_pubkey_pair(self, token, session_id):
+        if session_id not in self.session_ids:
+            self.session_ids.append(session_id)
+            self.api.get_swarm(session_id)
+        LokiDatabase.get_instance().insert_token(session_id, token)
+        if token not in self.push_fails.keys():
+            self.push_fails[token] = 0
 
     def remove_invalid_token(self, token):
-        for pubkey, tokens in self.pubkey_token_dict.items():
-            if token in tokens:
-                self.pubkey_token_dict[pubkey].remove(token)
-                if len(self.pubkey_token_dict[pubkey]) == 0:
-                    self.pubkey_token_dict.pop(pubkey)
-                break
-            with open(PUBKEY_TOKEN_DB, 'wb') as pubkey_token_db:
-                pickle.dump(self.pubkey_token_dict, pubkey_token_db)
-            pubkey_token_db.close()
+        LokiDatabase.get_instance().remove_token(token)
+        
 
     async def fetch_messages(self):
         self.logger.info('fetch run at ' + time.asctime(time.localtime(time.time())) +

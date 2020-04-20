@@ -67,9 +67,11 @@ class LokiDatabase:
     def insert_token(self, session_id, token):
         self.sqlite_db.connect()
         session = Session.get(Session.session_id == session_id)
-        if not session:
+        if session is None:
             session = Session.create(session_id=session_id)
-        token_record = Token.create(device_token=token, session=session)
+        token_record = Token.get(Token.device_token == token)
+        if token_record is None:
+            token_record = Token.create(device_token=token, session=session)
         self.sqlite_db.close()
         return token_record
 
@@ -108,7 +110,7 @@ class LokiDatabase:
         self.sqlite_db.connect()
         session = Session.get(Session.session_id == session_id)
         old_hash = session.last_hash
-        if old_hash.expiration < process_expiration(expiration):
+        if old_hash.expiration < expiration:
             old_hash.hash_value = hash_value
             old_hash.expiration = expiration
             old_hash.save()
