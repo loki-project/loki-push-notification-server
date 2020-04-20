@@ -1,8 +1,9 @@
 from peewee import *
-from const import SQLITE_DB
-import os
+from const import *
+import os, pickle
 from utils import *
 
+is_new_db = os.path.isfile(SQLITE_DB)
 db = SqliteDatabase(SQLITE_DB)
 
 
@@ -28,14 +29,40 @@ class Token(BaseModel):
 
 
 class LokiDatabase:
+    __instance = None
+
+    @staticmethod
+    def get_instance():
+        """ Static access method. """
+        if LokiDatabase.__instance is None:
+            LokiDatabase()
+        return LokiDatabase.__instance
+
     def __init__(self):
-        self.sqlite_db = db
+        if LokiDatabase.__instance is not None:
+            raise Exception("LokiDatabase is a singleton!")
+        else:
+            self.sqlite_db = db
+            LokiDatabase.__instance = self
+            if is_new_db:
+                self.migration()
 
     def create_tables(self):
         self.sqlite_db.create_tables([LastHash, Session, Token])
 
     def migration(self):
-        pass
+        self.sqlite_db.connect()
+        pubkey_token_dict = {}
+        self.create_tables()
+        if os.path.isfile(PUBKEY_TOKEN_DB):
+            with open(PUBKEY_TOKEN_DB, 'rb') as pubkey_token_db:
+                pubkey_token_dict = dict(pickle.load(pubkey_token_db))
+            pubkey_token_db.close()
+        for session_id, tokens in pubkey_token_dict.items():
+            session = Session.create(session_id=session_id)
+            for token in tokens:
+                Token.create(device_token=token, session=session)
+        self.sqlite_db.close()
 
     def insert_token(self, session_id, token):
         self.sqlite_db.connect()
@@ -52,7 +79,7 @@ class LokiDatabase:
         token_record.delete()
         self.sqlite_db.close()
 
-    def get_all_session_ids(self):
+    def get_valid_session_ids(self):
         self.sqlite_db.connect()
         session_ids = []
         tokens = Token.select()

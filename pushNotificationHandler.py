@@ -5,10 +5,11 @@ from PyAPNs.apns2.client import APNsClient, NotificationPriority, Notification
 from PyAPNs.apns2.payload import Payload, PayloadAlert
 from PyAPNs.apns2.errors import *
 from lokiAPI import LokiAPI
+from lokiDatabase import *
 from utils import *
 import firebase_admin
 from firebase_admin import credentials, messaging
-from firebase_admin.exceptions import  *
+from firebase_admin.exceptions import *
 
 
 class PushNotificationHelper:
@@ -164,10 +165,7 @@ class NormalPushNotificationHelper(PushNotificationHelper):
         self.firebase_app = firebase_admin.initialize_app(credentials.Certificate(FIREBASE_TOKEN))
 
     def load_tokens(self):
-        if os.path.isfile(PUBKEY_TOKEN_DB):
-            with open(PUBKEY_TOKEN_DB, 'rb') as pubkey_token_db:
-                self.pubkey_token_dict = dict(pickle.load(pubkey_token_db))
-            pubkey_token_db.close()
+        self.pubkey_token_dict = LokiDatabase.get_valid_session_ids()
 
         for tokens in self.pubkey_token_dict.values():
             for token in tokens:
