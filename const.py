@@ -12,6 +12,7 @@ FAIL = 'Fail'
 
 TOKEN_DB = 'token_db'
 PUBKEY_TOKEN_DB = 'token_pubkey_db'
+SQLITE_DB = 'sqlite_database.db'
 CERT_FILE = 'cert.pem'
 FIREBASE_TOKEN = 'loki-5a81e-firebase-adminsdk-7plup-0698317995.json'
 # CERT_FILE = 'cert_dev.pem'
@@ -25,4 +26,4 @@ failureThreshold = 2
 apiVersion = 'v1'
 defaultTimeout = 20
 
-debug_mode = True
+debug_mode = False
