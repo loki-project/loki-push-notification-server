@@ -1,7 +1,7 @@
 from peewee import *
 from const import *
 import os, pickle
-from utils import *
+from lokiAPI import LokiAPITarget
 
 is_new_db = os.path.isfile(SQLITE_DB)
 db = SqliteDatabase(SQLITE_DB)
@@ -20,11 +20,25 @@ class LastHash(BaseModel):
 class Session(BaseModel):
     session_id = CharField(primary_key=True)
     last_hash = ForeignKeyField(LastHash, default=LastHash())
-    swarm = TextField(default="")
 
 
 class Token(BaseModel):
     device_token = CharField()
+    session = ForeignKeyField(Session)
+
+
+class RandomSnode(BaseModel):
+    address = CharField()
+    port = CharField()
+    id_key = CharField()
+    encryption_key = CharField()
+
+
+class Swarm(BaseModel):
+    address = CharField()
+    port = CharField()
+    id_key = CharField()
+    encryption_key = CharField()
     session = ForeignKeyField(Session)
 
 
@@ -48,7 +62,7 @@ class LokiDatabase:
                 self.migration()
 
     def create_tables(self):
-        self.sqlite_db.create_tables([LastHash, Session, Token])
+        self.sqlite_db.create_tables([LastHash, Session, Token, RandomSnode, Swarm])
 
     def migration(self):
         self.sqlite_db.connect()
@@ -115,3 +129,50 @@ class LokiDatabase:
             old_hash.expiration = expiration
             old_hash.save()
         self.sqlite_db.close()
+
+    def get_random_snode_pool(self):
+        random_snode_pool = []
+        self.sqlite_db.connect()
+        list_from_db = RandomSnode.get()
+        for snode in list_from_db:
+            target = LokiAPITarget(address=snode.address,
+                                   port=snode.port,
+                                   id_key=snode.id_key,
+                                   encryption_key=snode.encryption_key)
+            random_snode_pool.append(target)
+        self.sqlite_db.close()
+        return random_snode_pool
+
+    def save_random_snodes(self, random_snode_pool):
+        self.sqlite_db.connect()
+        for target in random_snode_pool:
+            RandomSnode.create(address=target.address,
+                               port=target.port,
+                               id_key=target.id_key,
+                               encryption_key=target.encryption_key)
+        self.sqlite_db.close()
+
+    def get_swarms(self, session_id):
+        swarms = []
+        self.sqlite_db.connect()
+        list_from_db = (Swarm.select(Swarm, Session).join(Session).where(Session.session_id == session_id))
+        for snode in list_from_db:
+            target = LokiAPITarget(address=snode.address,
+                                   port=snode.port,
+                                   id_key=snode.id_key,
+                                   encryption_key=snode.encryption_key)
+            swarms.append(target)
+        self.sqlite_db.close()
+        return swarms
+
+    def save_swarms(self, session_id, swarms):
+        self.sqlite_db.connect()
+        session = Session.get(Session.session_id == session_id)
+        for target in swarms:
+            Swarm.create(address=target.address,
+                         port=target.port,
+                         id_key=target.id_key,
+                         encryption_key=target.encryption_key,
+                         session=session)
+        self.sqlite_db.close()
+

@@ -9,8 +9,6 @@ import logging
 urllib3.disable_warnings()
 
 app = Flask(__name__)
-flask_logger = logging.getLogger('werkzeug')
-flask_logger.setLevel(logging.ERROR)
 logger = LokiLogger().logger
 SPN_helper = SilentPushNotificationHelper(logger)
 NPN_helper = NormalPushNotificationHelper(logger)
@@ -92,7 +90,7 @@ if __name__ == '__main__':
     SPN_helper.run()
     NPN_helper.run()
     port = 3000 if debug_mode else 5000
-    http_server = WSGIServer(('', port), app)
+    http_server = WSGIServer(('', port), app, log=None)
     http_server.serve_forever()
     SPN_helper.stop()
     NPN_helper.stop()

@@ -165,7 +165,7 @@ class NormalPushNotificationHelper(PushNotificationHelper):
         self.firebase_app = firebase_admin.initialize_app(credentials.Certificate(FIREBASE_TOKEN))
 
     def load_tokens(self):
-        self.session_ids = LokiDatabase.get_instance().get_valid_session_ids
+        self.session_ids = LokiDatabase.get_instance().get_valid_session_ids()
 
         for session_id in self.session_ids:
             tokens = LokiDatabase.get_instance().get_tokens(session_id)
@@ -186,12 +186,12 @@ class NormalPushNotificationHelper(PushNotificationHelper):
 
     def remove_invalid_token(self, token):
         LokiDatabase.get_instance().remove_token(token)
-        
+        self.session_ids = LokiDatabase.get_instance().get_valid_session_ids()
 
     async def fetch_messages(self):
         self.logger.info('fetch run at ' + time.asctime(time.localtime(time.time())) +
-                         ' for ' + str(len(self.pubkey_token_dict.keys())) + ' pubkeys')
-        return self.api.fetch_raw_messages(list(self.pubkey_token_dict.keys()), self.last_hash)
+                         ' for ' + str(len(self.session_ids)) + ' pubkeys')
+        return self.api.fetch_raw_messages(self.session_ids)
 
     async def send_push_notification(self):
         self.logger.info('Start to fetch and push')
@@ -200,20 +200,18 @@ class NormalPushNotificationHelper(PushNotificationHelper):
             notifications_Android = []
             start_fetching_time = int(round(time.time()))
             raw_messages = await self.fetch_messages()
-            for pubkey, messages in raw_messages.items():
+            for session_id, messages in raw_messages.items():
                 if len(messages) == 0:
                     continue
                 for message in messages:
-                    if pubkey not in self.pubkey_token_dict.keys():
+                    if session_id not in self.session_ids:
                         continue
                     message_expiration = process_expiration(message['expiration'])
                     current_time = int(round(time.time() * 1000))
-                    if message_expiration > self.last_hash[pubkey][EXPIRATION]:
-                        self.last_hash[pubkey] = {LASTHASH: message['hash'],
-                                                  EXPIRATION: message_expiration}
+                    self.update_last_hash(session_id, message['hash'], message_expiration)
                     if message_expiration - current_time < 23.9 * 60 * 60 * 1000:
                         continue
-                    for token in self.pubkey_token_dict[pubkey]:
+                    for token in LokiDatabase.get_instance().get_tokens(session_id):
                         if is_iOS_device_token(token):
                             alert = PayloadAlert(title='Session', body='You\'ve got a new message')
                             payload = Payload(alert=alert, badge=1, sound="default",

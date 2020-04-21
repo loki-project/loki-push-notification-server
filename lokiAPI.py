@@ -5,6 +5,7 @@ from base64 import b64decode
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+from lokiDatabase import *
 
 
 class LokiAPITarget:
@@ -72,17 +73,20 @@ class LokiAPI:
         self.random_snode_pool = []
         self.get_random_snode()
 
-    def get_swarm(self, pubkey):
+    def get_swarm(self, session_id):
         if len(self.random_snode_pool) == 0:
             self.get_random_snode()
 
-        if pubkey not in self.swarm_cache.keys():
-            self.swarm_cache[pubkey] = []
+        if session_id not in self.swarm_cache.keys():
+            self.swarm_cache[session_id] = LokiDatabase.get_instance().get_swarms(session_id)
+
+        if len(self.swarm_cache[session_id]) > 0:
+            return
         random_snode = random.choice(self.random_snode_pool)
         url = random_snode.address + ':' + random_snode.port + '/storage_rpc/' + apiVersion
         parameters = {'method': 'get_snodes_for_pubkey',
                       'params': {
-                          'pubKey': pubkey
+                          'pubKey': session_id
                       }}
         proxy = LokiSnodeProxy(random_snode, self)
         requests = [proxy.request_with_proxy(parameters)]
@@ -100,7 +104,8 @@ class LokiAPI:
                                        snode['port'],
                                        snode['pubkey_ed25519'],
                                        snode['pubkey_x25519'])
-                self.swarm_cache[pubkey].append(target)
+                self.swarm_cache[session_id].append(target)
+            LokiDatabase.get_instance().save_swarms(session_id, self.swarm_cache[session_id])
 
     def get_random_snode(self):
         target = random.choice(self.seed_node_pool)
@@ -129,6 +134,7 @@ class LokiAPI:
                                        snode['pubkey_ed25519'],
                                        snode['pubkey_x25519'])
                 self.random_snode_pool.append(target)
+        LokiDatabase.get_instance().save_random_snodes(self.random_snode_pool)
 
     def get_target_snodes(self, pubkey):
         if pubkey not in self.swarm_cache.keys() or len(self.swarm_cache[pubkey]) < minimumSnodeCount:
@@ -154,16 +160,14 @@ class LokiAPI:
             requests.append(proxy.request_with_proxy(parameters))
         return proxies, requests
 
-    def fetch_raw_messages(self, pubkey_list, last_hash):
+    def fetch_raw_messages(self, session_ids):
         proxies = []
         requests = []
         messages_dict = {}
-        for pubkey in pubkey_list:
-            messages_dict[pubkey] = []
-            hash_value = ""
-            if pubkey in last_hash:
-                hash_value = last_hash[pubkey][LASTHASH]
-            prx, req = self.get_raw_messages(pubkey, hash_value)
+        for session_id in session_ids:
+            messages_dict[session_id] = []
+            hash_value = LokiDatabase.get_instance().get_last_hash(session_id)
+            prx, req = self.get_raw_messages(session_id, hash_value)
             proxies += prx
             requests += req
         response = grequests.map(requests)
@@ -181,14 +185,14 @@ class LokiAPI:
             if not message_json or 'messages' not in dict(message_json).keys():
                 continue
             messages = list(message_json['messages'])
-            old_length = len(messages_dict[pubkey_list[pubkey_index]])
+            old_length = len(messages_dict[session_ids[pubkey_index]])
             new_length = len(messages)
             if old_length == 0:
-                messages_dict[pubkey_list[pubkey_index]] = messages
+                messages_dict[session_ids[pubkey_index]] = messages
             elif new_length > 0:
-                old_expiration = int(messages_dict[pubkey_list[pubkey_index]][old_length - 1]['expiration'])
+                old_expiration = int(messages_dict[session_ids[pubkey_index]][old_length - 1]['expiration'])
                 new_expiration = int(messages[new_length - 1]['expiration'])
                 if new_expiration > old_expiration:
-                    messages_dict[pubkey_list[pubkey_index]] = messages
+                    messages_dict[session_ids[pubkey_index]] = messages
         return messages_dict
 

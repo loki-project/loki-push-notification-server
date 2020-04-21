@@ -26,4 +26,4 @@ failureThreshold = 2
 apiVersion = 'v1'
 defaultTimeout = 20
 
-debug_mode = False
+debug_mode = True
