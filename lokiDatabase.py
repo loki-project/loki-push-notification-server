@@ -1,9 +1,20 @@
 from peewee import *
 from const import *
 import os, pickle
-from lokiAPI import LokiAPITarget
 
-is_new_db = os.path.isfile(SQLITE_DB)
+
+class LokiAPITarget:
+    def __init__(self, address, port, id_key, encryption_key):
+        self.address = 'https://' + address
+        self.port = str(port)
+        self.id_key = id_key
+        self.encryption_key = encryption_key
+
+    def __str__(self):
+        return self.address + ':' + self.port
+
+
+is_new_db = not os.path.isfile(SQLITE_DB)
 db = SqliteDatabase(SQLITE_DB)
 
 
@@ -19,7 +30,7 @@ class LastHash(BaseModel):
 
 class Session(BaseModel):
     session_id = CharField(primary_key=True)
-    last_hash = ForeignKeyField(LastHash, default=LastHash())
+    last_hash = ForeignKeyField(LastHash)
 
 
 class Token(BaseModel):
@@ -58,8 +69,6 @@ class LokiDatabase:
         else:
             self.sqlite_db = db
             LokiDatabase.__instance = self
-            if is_new_db:
-                self.migration()
 
     def create_tables(self):
         self.sqlite_db.create_tables([LastHash, Session, Token, RandomSnode, Swarm])
@@ -73,7 +82,7 @@ class LokiDatabase:
                 pubkey_token_dict = dict(pickle.load(pubkey_token_db))
             pubkey_token_db.close()
         for session_id, tokens in pubkey_token_dict.items():
-            session = Session.create(session_id=session_id)
+            session = Session.create(session_id=session_id, last_hash=LastHash())
             for token in tokens:
                 Token.create(device_token=token, session=session)
         self.sqlite_db.close()

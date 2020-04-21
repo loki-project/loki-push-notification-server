@@ -8,17 +8,6 @@ from Crypto.Random import get_random_bytes
 from lokiDatabase import *
 
 
-class LokiAPITarget:
-    def __init__(self, address, port, id_key, encryption_key):
-        self.address = 'https://' + address
-        self.port = str(port)
-        self.id_key = id_key
-        self.encryption_key = encryption_key
-
-    def __str__(self):
-        return self.address + ':' + self.port
-
-
 class LokiSnodeProxy:
     def __init__(self, target, api):
         self.target = target

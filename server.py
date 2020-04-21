@@ -4,12 +4,14 @@ from const import *
 from gevent.pywsgi import WSGIServer
 from lokiLogger import LokiLogger
 import urllib3
-import logging
+from lokiDatabase import *
 
 urllib3.disable_warnings()
 
 app = Flask(__name__)
 logger = LokiLogger().logger
+if is_new_db:
+    LokiDatabase.get_instance().migration()
 SPN_helper = SilentPushNotificationHelper(logger)
 NPN_helper = NormalPushNotificationHelper(logger)
 
