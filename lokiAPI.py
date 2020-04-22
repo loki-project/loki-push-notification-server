@@ -63,6 +63,7 @@ class LokiAPI:
         self.get_random_snode()
 
     def get_swarm(self, session_id):
+        print("get swarm for " + session_id)
         if len(self.random_snode_pool) == 0:
             self.get_random_snode()
 
@@ -97,6 +98,9 @@ class LokiAPI:
             LokiDatabase.get_instance().save_swarms(session_id, self.swarm_cache[session_id])
 
     def get_random_snode(self):
+        self.random_snode_pool = LokiDatabase.get_instance().get_random_snode_pool()
+        if len(self.random_snode_pool) > 0:
+            return
         target = random.choice(self.seed_node_pool)
         url = target + '/json_rpc'
         parameters = {'method': 'get_n_service_nodes',
@@ -128,8 +132,10 @@ class LokiAPI:
     def get_target_snodes(self, pubkey):
         if pubkey not in self.swarm_cache.keys() or len(self.swarm_cache[pubkey]) < minimumSnodeCount:
             self.swarm_cache[pubkey] = []
-            while len(self.swarm_cache[pubkey]) < minimumSnodeCount:
+            retry = 0
+            while len(self.swarm_cache[pubkey]) < minimumSnodeCount and retry < 5:
                 self.get_swarm(pubkey)
+                retry += 1
         random.shuffle(self.swarm_cache[pubkey])
         return self.swarm_cache[pubkey][:3]
 
@@ -156,6 +162,7 @@ class LokiAPI:
         for session_id in session_ids:
             messages_dict[session_id] = []
             hash_value = LokiDatabase.get_instance().get_last_hash(session_id)
+            print(hash_value)
             prx, req = self.get_raw_messages(session_id, hash_value)
             proxies += prx
             requests += req

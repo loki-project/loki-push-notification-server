@@ -100,19 +100,18 @@ class LokiDatabase:
 
     def insert_token(self, session_id, token):
         self.connect_db_if_needed()
-        session = Session.get(Session.session_id == session_id)
+        session = Session.get_or_none(Session.session_id == session_id)
         if session is None:
-            session = Session.create(session_id=session_id)
-        token_record = Token.get(Token.device_token == token)
-        if token_record is None:
-            token_record = Token.create(device_token=token, session=session)
+            session = Session.create(session_id=session_id, last_hash=LastHash.create())
+        token_record = Token.get_or_create(device_token=token, session=session)
         self.close_db_if_needed()
         return token_record
 
     def remove_token(self, token):
         self.connect_db_if_needed()
-        token_record = Token.get(Token.device_token == token)
-        token_record.delete()
+        token_record = Token.get_or_none(Token.device_token == token)
+        if token_record:
+            token_record.delete()
         self.close_db_if_needed()
 
     def get_valid_session_ids(self):
@@ -136,24 +135,28 @@ class LokiDatabase:
 
     def get_last_hash(self, session_id):
         self.connect_db_if_needed()
-        session = Session.get(Session.session_id == session_id)
+        session = Session.get_or_none(session_id=session_id)
         self.close_db_if_needed()
-        return session.last_hash.hash_value
+        if session:
+            return session.last_hash.hash_value
+        else:
+            return ""
 
     def update_last_hash(self, session_id, hash_value, expiration):
         self.connect_db_if_needed()
-        session = Session.get(Session.session_id == session_id)
-        old_hash = session.last_hash
-        if old_hash.expiration < expiration:
-            old_hash.hash_value = hash_value
-            old_hash.expiration = expiration
-            old_hash.save()
+        session = Session.get_or_none(Session.session_id == session_id)
+        if session:
+            old_hash = session.last_hash
+            if old_hash.expiration < expiration:
+                old_hash.hash_value = hash_value
+                old_hash.expiration = expiration
+                old_hash.save()
         self.close_db_if_needed()
 
     def get_random_snode_pool(self):
         random_snode_pool = []
         self.connect_db_if_needed()
-        list_from_db = RandomSnode.get()
+        list_from_db = RandomSnode.select()
         for snode in list_from_db:
             target = LokiAPITarget(address=snode.address,
                                    port=snode.port,
@@ -187,12 +190,12 @@ class LokiDatabase:
 
     def save_swarms(self, session_id, swarms):
         self.connect_db_if_needed()
-        session = Session.get(Session.session_id == session_id)
-        for target in swarms:
-            Swarm.create(address=target.address,
-                         port=target.port,
-                         id_key=target.id_key,
-                         encryption_key=target.encryption_key,
-                         session=session)
+        session = Session.get_or_none(Session.session_id == session_id)
+        if session:
+            for target in swarms:
+                Swarm.create(address=target.address,
+                             port=target.port,
+                             id_key=target.id_key,
+                             encryption_key=target.encryption_key,
+                             session=session)
         self.close_db_if_needed()
-

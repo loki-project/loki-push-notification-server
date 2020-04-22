@@ -174,12 +174,12 @@ class NormalPushNotificationHelper(PushNotificationHelper):
 
     def update_last_hash(self, session_id, last_hash, expiration):
         expiration = process_expiration(expiration)
-        LokiDatabase.get_instance().update_last_hash(session_id, last_hash, expiration)
+        if session_id in self.session_ids:
+            LokiDatabase.get_instance().update_last_hash(session_id, last_hash, expiration)
 
     def update_token_pubkey_pair(self, token, session_id):
         if session_id not in self.session_ids:
             self.session_ids.append(session_id)
-            self.api.get_swarm(session_id)
         LokiDatabase.get_instance().insert_token(session_id, token)
         if token not in self.push_fails.keys():
             self.push_fails[token] = 0
