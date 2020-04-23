@@ -63,7 +63,6 @@ class LokiAPI:
         self.get_random_snode()
 
     def get_swarm(self, session_id):
-        print("get swarm for " + session_id)
         if len(self.random_snode_pool) == 0:
             self.get_random_snode()
 
