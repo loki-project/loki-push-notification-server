@@ -24,6 +24,7 @@ targetSnodeCount = 3
 maxRandomSnodePoolSize = 1024
 failureThreshold = 2
 apiVersion = 'v1'
-defaultTimeout = 20
+defaultTimeout = 5
 
-debug_mode = True
+debug_mode = False
+

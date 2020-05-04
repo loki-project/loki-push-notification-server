@@ -159,7 +159,7 @@ class SilentPushNotificationHelper(PushNotificationHelper):
 
 class NormalPushNotificationHelper(PushNotificationHelper):
     def __init__(self, logger):
-        self.api = LokiAPI()
+        self.api = LokiAPI(logger)
         self.session_ids = []
         super().__init__(logger)
         self.firebase_app = firebase_admin.initialize_app(credentials.Certificate(FIREBASE_TOKEN))
