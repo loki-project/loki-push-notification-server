@@ -175,7 +175,8 @@ class NormalPushNotificationHelper(PushNotificationHelper):
     def update_last_hash(self, session_id, last_hash, expiration):
         expiration = process_expiration(expiration)
         if session_id in self.session_ids:
-            LokiDatabase.get_instance().update_last_hash(session_id, last_hash, expiration)
+            return LokiDatabase.get_instance().update_last_hash(session_id, last_hash, expiration)
+        return False
 
     def update_token_pubkey_pair(self, token, session_id):
         if session_id not in self.session_ids:
@@ -208,7 +209,7 @@ class NormalPushNotificationHelper(PushNotificationHelper):
                         continue
                     message_expiration = process_expiration(message['expiration'])
                     current_time = int(round(time.time() * 1000))
-                    self.update_last_hash(session_id, message['hash'], message_expiration)
+                    is_last_hash_updated = self.update_last_hash(session_id, message['hash'], message_expiration)
                     if message_expiration - current_time < 23.9 * 60 * 60 * 1000:
                         continue
                     for token in LokiDatabase.get_instance().get_tokens(session_id):
@@ -222,6 +223,10 @@ class NormalPushNotificationHelper(PushNotificationHelper):
                             notification = messaging.Message(data={'ENCRYPTED_DATA': message['data']},
                                                              token=token)
                             notifications_Android.append(notification)
+                        if len(messages) == 10 and not is_last_hash_updated:
+                            last_message = messages[9]
+                            message_expiration = process_expiration(last_message['expiration'])
+                            self.update_last_hash(session_id, last_message['hash'], message_expiration)
             self.execute_push_iOS(notifications_iOS, NotificationPriority.Immediate)
             self.execute_push_Android(notifications_Android)
             fetching_time = int(round(time.time())) - start_fetching_time

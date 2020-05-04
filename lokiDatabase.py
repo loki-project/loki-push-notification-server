@@ -144,14 +144,17 @@ class LokiDatabase:
 
     def update_last_hash(self, session_id, hash_value, expiration):
         self.connect_db_if_needed()
+        result = False
         session = Session.get_or_none(Session.session_id == session_id)
         if session:
             old_hash = session.last_hash
             if old_hash.expiration < expiration:
                 old_hash.hash_value = hash_value
                 old_hash.expiration = expiration
+                result = True
                 old_hash.save()
         self.close_db_if_needed()
+        return result
 
     def get_random_snode_pool(self):
         random_snode_pool = []
